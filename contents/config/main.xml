@@ -50,5 +50,29 @@
             <label>Path to Claude config folder (optional)</label>
             <default></default>
         </entry>
+        <entry name="proxyEnabled" type="Bool">
+            <label>Route the usage request through a proxy</label>
+            <default>false</default>
+        </entry>
+        <entry name="proxyType" type="String">
+            <label>Proxy type (http, https, socks5, socks5h)</label>
+            <default>http</default>
+        </entry>
+        <entry name="proxyHost" type="String">
+            <label>Proxy host</label>
+            <default></default>
+        </entry>
+        <entry name="proxyPort" type="Int">
+            <label>Proxy port</label>
+            <default>8080</default>
+        </entry>
+        <entry name="proxyUser" type="String">
+            <label>Proxy username (optional)</label>
+            <default></default>
+        </entry>
+        <entry name="proxyPassword" type="String">
+            <label>Proxy password (optional)</label>
+            <default></default>
+        </entry>
     </group>
 </kcfg>

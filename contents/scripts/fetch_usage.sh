@@ -42,11 +42,25 @@ if [ "$EXPIRED" = "1" ]; then
     error_json "token_expired" "OAuth token has expired. Run claude to refresh."
 fi
 
-# Call usage API - auth header passed via stdin (-K -) to avoid token in /proc/cmdline
+# Call usage API - auth header (and optional proxy) passed via stdin (-K -)
+# to keep the token and proxy password off curl's command line.
 TMPFILE=$(mktemp)
 trap 'rm -f "$TMPFILE"' EXIT
 
-HTTP_CODE=$(printf 'header = "Authorization: Bearer %s"\n' "$TOKEN" | \
+PROXY="${CM_PROXY:-}"
+PROXY_USER="${CM_PROXY_USER:-}"
+
+build_curl_config() {
+    printf 'header = "Authorization: Bearer %s"\n' "$TOKEN"
+    if [ -n "$PROXY" ]; then
+        printf 'proxy = "%s"\n' "$PROXY"
+    fi
+    if [ -n "$PROXY_USER" ]; then
+        printf 'proxy-user = "%s"\n' "$PROXY_USER"
+    fi
+}
+
+HTTP_CODE=$(build_curl_config | \
     curl -s --max-time 10 -o "$TMPFILE" -w '%{http_code}' \
     -K - \
     -H "anthropic-beta: oauth-2025-04-20" \

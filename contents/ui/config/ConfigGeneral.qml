@@ -26,6 +26,12 @@ KCM.SimpleKCM {
     property string cfg_warningColor
     property alias cfg_currencySymbol: currencyField.text
     property string cfg_claudeFolder
+    property alias cfg_proxyEnabled: proxyEnabledCheck.checked
+    property string cfg_proxyType
+    property alias cfg_proxyHost: proxyHostField.text
+    property alias cfg_proxyPort: proxyPortField.text
+    property alias cfg_proxyUser: proxyUserField.text
+    property alias cfg_proxyPassword: proxyPasswordField.text
 
     // Defaults injected by Plasma config system
     property var cfg_pollIntervalDefault
@@ -39,6 +45,12 @@ KCM.SimpleKCM {
     property var cfg_warningColorDefault
     property var cfg_currencySymbolDefault
     property var cfg_claudeFolderDefault
+    property var cfg_proxyEnabledDefault
+    property var cfg_proxyTypeDefault
+    property var cfg_proxyHostDefault
+    property var cfg_proxyPortDefault
+    property var cfg_proxyUserDefault
+    property var cfg_proxyPasswordDefault
 
     readonly property var styleModel: [
         { value: "bars", label: "Bars" },
@@ -53,6 +65,12 @@ KCM.SimpleKCM {
         { value: "five_hour", label: "5-Hour Window" },
         { value: "seven_day", label: "Weekly All" },
         { value: "model_weekly", label: "Weekly (top model)" }
+    ]
+    readonly property var proxyTypeModel: [
+        { value: "http", label: "HTTP" },
+        { value: "https", label: "HTTPS" },
+        { value: "socks5", label: "SOCKS5 (local DNS)" },
+        { value: "socks5h", label: "SOCKS5h (remote DNS)" }
     ]
 
     Kirigami.FormLayout {
@@ -179,6 +197,65 @@ KCM.SimpleKCM {
             implicitWidth: Kirigami.Units.gridUnit * 18
             text: cfg_claudeFolder
             onTextChanged: cfg_claudeFolder = text
+        }
+
+        Kirigami.Separator {
+            Kirigami.FormData.isSection: true
+            Kirigami.FormData.label: "Proxy"
+        }
+
+        QQC2.CheckBox {
+            id: proxyEnabledCheck
+            Kirigami.FormData.label: "Use proxy:"
+            text: "Route the usage request through a proxy"
+        }
+
+        QQC2.ComboBox {
+            id: proxyTypeCombo
+            Kirigami.FormData.label: "Proxy type:"
+            model: configGeneral.proxyTypeModel
+            textRole: "label"
+            visible: proxyEnabledCheck.checked
+            currentIndex: {
+                for (var i = 0; i < model.length; i++) {
+                    if (model[i].value === cfg_proxyType) return i
+                }
+                return 0
+            }
+            onActivated: cfg_proxyType = model[currentIndex].value
+        }
+
+        QQC2.TextField {
+            id: proxyHostField
+            Kirigami.FormData.label: "Host:"
+            placeholderText: "127.0.0.1"
+            implicitWidth: Kirigami.Units.gridUnit * 18
+            visible: proxyEnabledCheck.checked
+        }
+
+        QQC2.TextField {
+            id: proxyPortField
+            Kirigami.FormData.label: "Port:"
+            placeholderText: "8080"
+            implicitWidth: Kirigami.Units.gridUnit * 18
+            visible: proxyEnabledCheck.checked
+        }
+
+        QQC2.TextField {
+            id: proxyUserField
+            Kirigami.FormData.label: "Username:"
+            placeholderText: "(optional)"
+            implicitWidth: Kirigami.Units.gridUnit * 18
+            visible: proxyEnabledCheck.checked
+        }
+
+        QQC2.TextField {
+            id: proxyPasswordField
+            Kirigami.FormData.label: "Password:"
+            placeholderText: "(optional)"
+            echoMode: TextInput.Password
+            implicitWidth: Kirigami.Units.gridUnit * 18
+            visible: proxyEnabledCheck.checked
         }
     }
 }

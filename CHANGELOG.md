@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0 - 2026-06-08
+
+- Add optional proxy support for the usage request: configure an HTTP, HTTPS, or SOCKS5 proxy (with optional username/password) in the widget settings. The proxy password, like the OAuth token, is passed to `curl` via stdin so it never appears on a process command line
+
 ## 0.4.0 - 2026-06-07
 
 - Add "Claude folder" config option to point the widget at an alternate Claude config folder (e.g. `~/.claude-personal` when using `CLAUDE_CONFIG_DIR` for multiple accounts). Each widget instance can monitor a different account

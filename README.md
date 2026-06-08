@@ -64,6 +64,7 @@ Right-click the widget and select "Configure...". Options include:
 - **Warning / Critical thresholds** - percentage thresholds for color changes
 - **Colors** - customize the normal and warning bar colors
 - **Claude folder** - path to an alternate Claude config folder (default: `~/.claude`). Useful if you run multiple accounts via `CLAUDE_CONFIG_DIR`, e.g. `~/.claude-personal`. Add one widget instance per account to monitor them side by side
+- **Proxy** - optionally route the usage request through an HTTP, HTTPS, or SOCKS5 proxy. Enable "Use proxy" and set the type, host, port, and optional username/password. The proxy password is passed to `curl` via stdin (not as a command-line argument)
 
 ## Troubleshooting
 

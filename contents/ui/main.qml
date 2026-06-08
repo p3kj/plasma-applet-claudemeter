@@ -82,16 +82,40 @@ PlasmoidItem {
         }
     }
 
+    // Single-quote a value for safe use in a shell command, escaping any
+    // embedded single quotes (e.g. in a proxy password).
+    function shellQuote(s) {
+        return "'" + String(s).replace(/'/g, "'\\''") + "'"
+    }
+
+    // Assemble the fetch command, optionally prefixed with proxy env vars.
+    // All call sites use this so connect/disconnect keys match exactly.
+    function buildFetchCommand() {
+        var scriptPath = decodeURIComponent(Qt.resolvedUrl("../scripts/fetch_usage.sh").toString().replace(/^file:\/\//, ""))
+        var folder = root.claudeFolder.trim()
+        var cfg = plasmoid.configuration
+        var prefix = ""
+        if (cfg.proxyEnabled && cfg.proxyHost.trim()) {
+            var type = cfg.proxyType || "http"
+            var host = cfg.proxyHost.trim()
+            var port = cfg.proxyPort
+            prefix += "CM_PROXY=" + shellQuote(type + "://" + host + ":" + port) + " "
+            var user = cfg.proxyUser.trim()
+            if (user) {
+                prefix += "CM_PROXY_USER=" + shellQuote(user + ":" + cfg.proxyPassword) + " "
+            }
+        }
+        var cmd = prefix + "bash \"" + scriptPath + "\""
+        if (folder) cmd += " \"" + folder + "\""
+        return cmd
+    }
+
     function fetchUsage() {
         root.fetchInFlight = true
         root.loading = true
         root.lastFetchTime = Date.now()
         fetchTimeoutTimer.restart()
-        var scriptPath = decodeURIComponent(Qt.resolvedUrl("../scripts/fetch_usage.sh").toString().replace(/^file:\/\//, ""))
-        var folder = root.claudeFolder.trim()
-        var cmd = "bash \"" + scriptPath + "\""
-        if (folder) cmd += " \"" + folder + "\""
-        executable.exec(cmd)
+        executable.exec(root.buildFetchCommand())
     }
 
     function requestFetch(source) {
@@ -261,11 +285,7 @@ PlasmoidItem {
         running: false
         repeat: false
         onTriggered: {
-            var scriptPath = decodeURIComponent(Qt.resolvedUrl("../scripts/fetch_usage.sh").toString().replace(/^file:\/\//, ""))
-            var folder = root.claudeFolder.trim()
-            var cmd = "bash \"" + scriptPath + "\""
-            if (folder) cmd += " \"" + folder + "\""
-            executable.disconnectSource(cmd)
+            executable.disconnectSource(root.buildFetchCommand())
             root.fetchInFlight = false
             root.loading = false
             root.hasError = true
