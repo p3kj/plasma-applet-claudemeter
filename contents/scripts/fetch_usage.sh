@@ -22,8 +22,34 @@ if [ ! -f "$CRED_FILE" ]; then
     error_json "no_credentials" "Credentials file not found"
 fi
 
-# Extract token and check expiry via python3, reading creds from file (not args)
-read -r TOKEN EXPIRED < <(python3 -c "
+# Extract token and expiry info via python3, reading creds from file (not args)
+# Returns: TOKEN EXPIRED EXPIRES_AT NOW_MS (space-separated)
+read -r TOKEN EXPIRED EXPIRES_AT NOW_MS < <(python3 -c "
+import json, sys, time
+try:
+    with open(sys.argv[1]) as f:
+        creds = json.load(f)
+    oauth = creds['claudeAiOauth']
+    token = oauth['accessToken']
+    expires_at = oauth.get('expiresAt', 0)
+    now_ms = int(time.time() * 1000)
+    expired = '1' if (expires_at and now_ms > expires_at) else '0'
+    print(token, expired, expires_at, now_ms)
+except Exception as e:
+    sys.exit(1)
+" "$CRED_FILE" 2>/dev/null) || error_json "parse_error" "Failed to parse credentials file"
+
+# Auto-refresh: if token is expired or within 1 hour of expiry, try refreshing via claude auth status
+if [ "$EXPIRED" = "1" ] || { [ "$EXPIRES_AT" -ne 0 ] && [ $((EXPIRES_AT - NOW_MS)) -lt 3600000 ] 2>/dev/null; }; then
+    CLAUDE_BIN="$(command -v claude 2>/dev/null)"
+    if [ -z "$CLAUDE_BIN" ]; then
+        CLAUDE_BIN="$HOME/.local/bin/claude"
+    fi
+    if [ -x "$CLAUDE_BIN" ]; then
+        # Run claude auth status to trigger OAuth token refresh (handled internally by Claude Code)
+        timeout 15 "$CLAUDE_BIN" auth status --json >/dev/null 2>&1 || true
+        # Re-read credentials after potential refresh
+        read -r TOKEN EXPIRED _ < <(python3 -c "
 import json, sys, time
 try:
     with open(sys.argv[1]) as f:
@@ -34,12 +60,14 @@ try:
     now_ms = int(time.time() * 1000)
     expired = '1' if (expires_at and now_ms > expires_at) else '0'
     print(token, expired)
-except Exception as e:
+except Exception:
     sys.exit(1)
-" "$CRED_FILE" 2>/dev/null) || error_json "parse_error" "Failed to parse credentials file"
+" "$CRED_FILE" 2>/dev/null) || error_json "refresh_failed" "Token refresh failed. Try running 'claude auth login' to re-authenticate."
+    fi
+fi
 
 if [ "$EXPIRED" = "1" ]; then
-    error_json "token_expired" "OAuth token has expired. Run claude to refresh."
+    error_json "token_expired" "OAuth token has expired and could not be refreshed. Run 'claude auth login' to re-authenticate."
 fi
 
 # Call usage API - auth header passed via stdin (-K -) to avoid token in /proc/cmdline
