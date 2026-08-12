@@ -9,7 +9,7 @@ A KDE Plasma 6 panel applet that monitors your Claude Code rate limits.
 ## Features
 
 - Displays the 5-hour and 7-day (all models) rate limit windows
-- Adds a separate bar for any active model-specific weekly limit returned by the API (e.g. Opus, Cowork), discovered dynamically so new plan tiers work without an update
+- Adds a separate bar for every scoped weekly limit the API reports (e.g. Fable), discovered dynamically so new models and plan tiers work without an update
 - Two compact panel styles: stacked bars or circular gauge
 - Configurable warning/critical thresholds with color coding
 - Customizable bar colors
@@ -20,7 +20,7 @@ A KDE Plasma 6 panel applet that monitors your Claude Code rate limits.
 
 1. Reads the OAuth token from `~/.claude/.credentials.json` (created by the Claude Code CLI when you sign in)
 2. Calls `GET https://api.anthropic.com/api/oauth/usage` with a bearer token
-3. Parses the response for the 5-hour and 7-day windows, plus any `seven_day_*` per-model entries that have an active limit or non-zero utilization
+3. Parses the response for the 5-hour and 7-day windows, plus every scoped weekly limit in the `limits` array that has a reset time or non-zero utilization (the older top-level `seven_day_*` fields are still read as a fallback)
 4. The token is passed to `curl` via stdin (not as a command-line argument, which would be visible in `/proc`)
 
 > **Note:** This widget uses an internal Anthropic API endpoint that is not part of the public API documentation. It may change or stop working without notice.
@@ -59,7 +59,8 @@ kpackagetool6 -t Plasma/Applet -r com.github.p3kj.claudemeter
 Right-click the widget and select "Configure...". Options include:
 
 - **Panel style** - bars (stacked) or gauge (circular arc)
-- **Gauge metric** - 5-hour window, 7-day (all models), or the most-utilized active per-model weekly
+- **Gauge metric** - 5-hour window, 7-day (all models), or the most-utilized scoped weekly
+- **Inner ring** - a second, thinner arc inside the gauge for another metric (default: the top scoped weekly). Hidden when there is no such limit, when it would duplicate the gauge metric, or on a panel too thin for two rings
 - **Poll interval** - how often to fetch usage data (default: 900s)
 - **Warning / Critical thresholds** - percentage thresholds for color changes
 - **Colors** - customize the normal and warning bar colors

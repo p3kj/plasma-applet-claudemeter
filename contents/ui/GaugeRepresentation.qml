@@ -12,6 +12,14 @@ Item {
     readonly property color arcColor: root.compactColor
     readonly property bool isDark: Kirigami.Theme.backgroundColor.hslLightness < 0.5
     readonly property color trackColor: isDark ? "#33373B" : "#E5E7E8"
+    readonly property real ringThickness: Kirigami.Units.smallSpacing * 1.1
+    // Hairline gap: just enough to separate the two arcs, so the inner one stays
+    // close to the outer and leaves the centre free for the label.
+    readonly property real innerInset: ringThickness + Math.max(1, Math.round(ringThickness * 0.25))
+    // Below a handful of ring widths of diameter the second arc just smears into
+    // the first, so a thin panel gets the outer ring alone.
+    readonly property bool showInner: root.hasInnerRing
+        && Math.min(width, height) >= ringThickness * 6
 
     Layout.minimumWidth: Kirigami.Units.gridUnit
     Layout.minimumHeight: Kirigami.Units.gridUnit
@@ -24,7 +32,7 @@ Item {
         fromAngle: -180
         toAngle: 180
         smoothEnds: true
-        thickness: Kirigami.Units.smallSpacing * 1.1
+        thickness: gaugeRep.ringThickness
         range { from: 0; to: 100; automatic: false }
         valueSources: Charts.SingleValueSource { value: 100 }
         colorSource: Charts.SingleValueSource { value: gaugeRep.trackColor }
@@ -38,7 +46,7 @@ Item {
         fromAngle: -180
         toAngle: 180
         smoothEnds: true
-        thickness: Kirigami.Units.smallSpacing * 1.1
+        thickness: gaugeRep.ringThickness
 
         range {
             from: 0
@@ -52,6 +60,35 @@ Item {
         colorSource: Charts.SingleValueSource {
             value: gaugeRep.arcColor
         }
+    }
+
+    // Inner track for the secondary metric, drawn thinner so the outer ring
+    // stays the one the eye lands on.
+    Charts.PieChart {
+        anchors.fill: parent
+        anchors.margins: gaugeRep.innerInset
+        visible: gaugeRep.showInner
+        fromAngle: -180
+        toAngle: 180
+        smoothEnds: true
+        thickness: Math.max(2, gaugeRep.ringThickness * 0.8)
+        range { from: 0; to: 100; automatic: false }
+        valueSources: Charts.SingleValueSource { value: 100 }
+        colorSource: Charts.SingleValueSource { value: gaugeRep.trackColor }
+    }
+
+    // Inner usage arc
+    Charts.PieChart {
+        anchors.fill: parent
+        anchors.margins: gaugeRep.innerInset
+        visible: gaugeRep.showInner
+        fromAngle: -180
+        toAngle: 180
+        smoothEnds: true
+        thickness: Math.max(2, gaugeRep.ringThickness * 0.8)
+        range { from: 0; to: 100; automatic: false }
+        valueSources: Charts.SingleValueSource { value: root.innerUtil }
+        colorSource: Charts.SingleValueSource { value: root.innerColor }
     }
 
     Text {

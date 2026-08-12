@@ -25,7 +25,7 @@ MouseArea {
             ]
             for (var i = 0; i < root.weeklyModels.length; i++) {
                 var m = root.weeklyModels[i]
-                var name = m.label.replace(/^Weekly \(|\)$/g, "")
+                var name = m.name || m.label.replace(/^Weekly \(|\)$/g, "")
                 parts.push(name + ": " + Math.round(m.util) + "%")
             }
             return parts.join(" | ")

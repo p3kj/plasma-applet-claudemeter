@@ -14,8 +14,9 @@ PlasmoidItem {
     property string fiveHourResets: ""
     property real sevenDayUtil: 0
     property string sevenDayResets: ""
-    // Per-model weekly limits, discovered dynamically from any `seven_day_*`
-    // field in the API response. Each entry: { key, label, util, resets }.
+    // Scoped weekly limits, discovered dynamically from the API's `limits` array
+    // (or the legacy `seven_day_*` fields it replaced), so a new plan tier shows
+    // up without an update. Each entry: { key, name, label, util, resets }.
     property var weeklyModels: []
     property bool hasError: false
     property string errorMessage: ""
@@ -59,13 +60,43 @@ PlasmoidItem {
         }
         return top
     }
-    readonly property real compactUtil: compactMetric === "seven_day" ? sevenDayUtil
-        : compactMetric === "model_weekly" ? topWeeklyModel.util
-        : fiveHourUtil
-    readonly property string compactResets: compactMetric === "seven_day" ? sevenDayResets
-        : compactMetric === "model_weekly" ? topWeeklyModel.resets
-        : fiveHourResets
+    // Anything unrecognised, including a config value left over from an older
+    // release, falls back to the 5-hour window.
+    readonly property string outerMetric: (compactMetric === "seven_day" || compactMetric === "model_weekly")
+        ? compactMetric : "five_hour"
+    readonly property real compactUtil: metricUtil(outerMetric)
+    readonly property string compactResets: metricResets(outerMetric)
     readonly property color compactColor: usageColor(compactUtil)
+
+    // --- Inner gauge ring ---
+    readonly property string innerMetric: plasmoid.configuration.gaugeInnerMetric
+    readonly property real innerUtil: metricUtil(innerMetric)
+    readonly property string innerResets: metricResets(innerMetric)
+    readonly property color innerColor: usageColor(innerUtil)
+    // Nothing to gain from drawing the same number twice, and the default metric
+    // only exists for accounts that actually have a scoped weekly limit.
+    readonly property bool hasInnerRing: innerMetric !== "none"
+        && innerMetric !== outerMetric
+        && metricHasData(innerMetric)
+
+    // Metric resolution shared by both gauge rings.
+    function metricUtil(metric) {
+        if (metric === "five_hour") return fiveHourUtil
+        if (metric === "seven_day") return sevenDayUtil
+        if (metric === "model_weekly") return topWeeklyModel.util
+        return 0
+    }
+
+    function metricResets(metric) {
+        if (metric === "five_hour") return fiveHourResets
+        if (metric === "seven_day") return sevenDayResets
+        if (metric === "model_weekly") return topWeeklyModel.resets
+        return ""
+    }
+
+    function metricHasData(metric) {
+        return metricUtil(metric) > 0 || metricResets(metric) !== ""
+    }
 
     // --- Executable DataSource ---
     Plasma5Support.DataSource {
@@ -121,25 +152,71 @@ PlasmoidItem {
             root.hasError = false
             root.errorMessage = ""
 
+            var limits = Array.isArray(data.limits) ? data.limits : []
+
+            // The fixed windows have their own top-level fields and are also
+            // listed in `limits`. The dedicated fields keep float precision
+            // (`limits[].percent` is a rounded int) so they win where present,
+            // and `limits` only stands in if one of them goes away.
+            var sessionLimit = root.findLimit(limits, "session")
+            var weeklyAllLimit = root.findLimit(limits, "weekly_all")
             if (data.five_hour) {
                 root.fiveHourUtil = data.five_hour.utilization || 0
                 root.fiveHourResets = data.five_hour.resets_at || ""
+            } else if (sessionLimit) {
+                root.fiveHourUtil = sessionLimit.percent || 0
+                root.fiveHourResets = sessionLimit.resets_at || ""
             }
             if (data.seven_day) {
                 root.sevenDayUtil = data.seven_day.utilization || 0
                 root.sevenDayResets = data.seven_day.resets_at || ""
+            } else if (weeklyAllLimit) {
+                root.sevenDayUtil = weeklyAllLimit.percent || 0
+                root.sevenDayResets = weeklyAllLimit.resets_at || ""
             }
 
             var weeklies = []
+            var seenKeys = {}
+
+            // Every weekly that is not the all-models one is a scoped limit:
+            // per model today (Fable), possibly per surface tomorrow.
+            for (var i = 0; i < limits.length; i++) {
+                var limit = limits[i]
+                if (!limit || limit.group !== "weekly" || limit.kind === "weekly_all") continue
+                // Deliberately not filtered on `is_active`: the API sets it on
+                // the scoped entry while leaving it false on both fixed windows,
+                // so it does not mean "this limit is live".
+                var scopeName = root.scopeNameFor(limit.scope)
+                var scopeUtil = limit.percent || 0
+                var scopeResets = limit.resets_at || ""
+                if (scopeUtil <= 0 && !scopeResets) continue
+                var scopeKey = root.scopedKeyFor(scopeName)
+                seenKeys[scopeKey] = true
+                weeklies.push({
+                    key: scopeKey,
+                    name: scopeName,
+                    // The API already supplies the right casing, so the label is
+                    // built from the display name rather than from the key.
+                    label: "Weekly (" + scopeName + ")",
+                    util: scopeUtil,
+                    resets: scopeResets
+                })
+            }
+
+            // Legacy per-model fields, all null since 2026-08 but cheap to keep
+            // reading in case the shape moves again.
             for (var key in data) {
                 if (key === "seven_day" || key.indexOf("seven_day_") !== 0) continue
+                if (seenKeys[key]) continue
                 var entry = data[key]
                 if (!entry) continue
                 var util = entry.utilization || 0
                 var resets = entry.resets_at || ""
                 if (util <= 0 && !resets) continue
+                seenKeys[key] = true
                 weeklies.push({
                     key: key,
+                    name: root.weeklyNameFor(key),
                     label: root.weeklyLabelFor(key),
                     util: util,
                     resets: resets
@@ -181,13 +258,48 @@ PlasmoidItem {
     }
 
     // --- Helper functions ---
-    function weeklyLabelFor(key) {
+    function weeklyNameFor(key) {
         var suffix = key.replace(/^seven_day_/, "")
         var parts = suffix.split("_")
         for (var i = 0; i < parts.length; i++) {
             parts[i] = parts[i].charAt(0).toUpperCase() + parts[i].slice(1)
         }
-        return "Weekly (" + parts.join(" ") + ")"
+        return parts.join(" ")
+    }
+
+    function weeklyLabelFor(key) {
+        return "Weekly (" + root.weeklyNameFor(key) + ")"
+    }
+
+    // Canonical key for a scoped limit, so `limits` entries dedupe against
+    // legacy `seven_day_*` keys and sort with the same tiebreak.
+    function scopedKeyFor(displayName) {
+        return "seven_day_" + displayName.toLowerCase().replace(/[^a-z0-9]+/g, "_")
+    }
+
+    // What to call a scoped limit. `surface` comes as a bare string in some
+    // responses and as an object shaped like `model` in others.
+    function scopeNameFor(scope) {
+        if (scope) {
+            if (scope.model) {
+                if (scope.model.display_name) return scope.model.display_name
+                if (scope.model.id) return scope.model.id
+            }
+            if (scope.surface) {
+                if (typeof scope.surface === "string") return scope.surface
+                if (scope.surface.display_name) return scope.surface.display_name
+                if (scope.surface.id) return scope.surface.id
+            }
+        }
+        return "Scoped"
+    }
+
+    // First entry in the API's `limits` array of the given kind, or null.
+    function findLimit(limits, kind) {
+        for (var i = 0; i < limits.length; i++) {
+            if (limits[i] && limits[i].kind === kind) return limits[i]
+        }
+        return null
     }
 
     function usageColor(percent) {

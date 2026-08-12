@@ -21,6 +21,7 @@ KCM.SimpleKCM {
     property alias cfg_criticalThreshold: criticalSpinBox.value
     property string cfg_compactStyle
     property string cfg_compactMetric
+    property string cfg_gaugeInnerMetric
     property string cfg_gaugeLabel
     property string cfg_normalColor
     property string cfg_warningColor
@@ -34,6 +35,7 @@ KCM.SimpleKCM {
     property var cfg_criticalThresholdDefault
     property var cfg_compactStyleDefault
     property var cfg_compactMetricDefault
+    property var cfg_gaugeInnerMetricDefault
     property var cfg_gaugeLabelDefault
     property var cfg_normalColorDefault
     property var cfg_warningColorDefault
@@ -54,6 +56,9 @@ KCM.SimpleKCM {
         { value: "seven_day", label: "Weekly All" },
         { value: "model_weekly", label: "Weekly (top model)" }
     ]
+    readonly property var innerMetricModel: [
+        { value: "none", label: "None" }
+    ].concat(metricModel)
 
     Kirigami.FormLayout {
         QQC2.ComboBox {
@@ -83,6 +88,21 @@ KCM.SimpleKCM {
                 return 0
             }
             onActivated: cfg_compactMetric = model[currentIndex].value
+        }
+
+        QQC2.ComboBox {
+            id: innerMetricCombo
+            Kirigami.FormData.label: "Inner ring:"
+            model: configGeneral.innerMetricModel
+            textRole: "label"
+            visible: cfg_compactStyle === "gauge"
+            currentIndex: {
+                for (var i = 0; i < model.length; i++) {
+                    if (model[i].value === cfg_gaugeInnerMetric) return i
+                }
+                return 0
+            }
+            onActivated: cfg_gaugeInnerMetric = model[currentIndex].value
         }
 
         QQC2.ComboBox {

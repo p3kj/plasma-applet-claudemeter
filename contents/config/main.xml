@@ -30,6 +30,10 @@
             <label>Metric shown in gauge mode</label>
             <default>five_hour</default>
         </entry>
+        <entry name="gaugeInnerMetric" type="String">
+            <label>Metric shown in the gauge's inner ring</label>
+            <default>model_weekly</default>
+        </entry>
         <entry name="gaugeLabel" type="String">
             <label>Label shown inside gauge</label>
             <default>time</default>
