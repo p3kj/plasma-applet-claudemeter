@@ -76,6 +76,8 @@ Item {
             percentage: root.fiveHourUtil
             barColor: root.usageColor(root.fiveHourUtil)
             resetTime: root.formatResetTime(root.fiveHourResets)
+            segments: 5
+            pace: root.paceFraction(root.fiveHourResets, root.sessionWindowMs)
         }
 
         UsageBar {
@@ -84,6 +86,8 @@ Item {
             percentage: root.sevenDayUtil
             barColor: root.usageColor(root.sevenDayUtil)
             resetTime: root.formatResetTime(root.sevenDayResets)
+            segments: 7
+            pace: root.paceFraction(root.sevenDayResets, root.weeklyWindowMs)
         }
 
         Repeater {
@@ -94,6 +98,8 @@ Item {
                 percentage: modelData.util
                 barColor: root.usageColor(modelData.util)
                 resetTime: root.formatResetTime(modelData.resets)
+                segments: 7
+                pace: root.paceFraction(modelData.resets, root.weeklyWindowMs)
             }
         }
     }

@@ -33,6 +33,15 @@ PlasmoidItem {
     // --- Cache state ---
     property bool dataCached: false
 
+    // --- Clock ---
+    // Ticks so the countdowns and the pace marker keep up between polls: polls are
+    // 15 minutes apart and resets_at does not change within a window, so before
+    // this existed no binding on formatResetTime ever re-evaluated.
+    property date now: new Date()
+
+    readonly property int sessionWindowMs: 5 * 60 * 60 * 1000
+    readonly property int weeklyWindowMs: 7 * 24 * 60 * 60 * 1000
+
     // --- Activity monitor state ---
     property real lastActivityMtime: 0
 
@@ -315,7 +324,7 @@ PlasmoidItem {
     function formatResetTime(isoString) {
         if (!isoString) return ""
         var d = new Date(isoString)
-        var now = new Date()
+        var now = root.now
         var diffMs = d.getTime() - now.getTime()
         if (diffMs <= 0) return "expired"
         var diffMin = Math.floor(diffMs / 60000)
@@ -328,6 +337,21 @@ PlasmoidItem {
         }
         if (diffHrs > 0) return diffHrs + "h " + remainMin + "m"
         return diffMin + "m"
+    }
+
+    // Fraction 0..1 of a window that has elapsed, or -1 when it cannot be known.
+    // The API sends no window start, but both windows are a fixed length, so the
+    // start is resets_at minus that length.
+    function paceFraction(resetsAt, windowMs) {
+        if (!resetsAt || !windowMs) return -1
+        var end = new Date(resetsAt).getTime()
+        if (isNaN(end)) return -1
+        var elapsed = windowMs - (end - root.now.getTime())
+        // Unknown, rather than pinned to an edge: over a window elapsed means the
+        // reset is already past (stale payload, or no session in the last 5h), and
+        // under zero means it is more than a whole window out (clock skew).
+        if (elapsed < 0 || elapsed > windowMs) return -1
+        return elapsed / windowMs
     }
 
     // --- Activity monitor DataSource ---
@@ -392,6 +416,16 @@ PlasmoidItem {
         running: false
         repeat: false
         onTriggered: root.requestFetch("activity")
+    }
+
+    // --- Clock tick ---
+    // 30s is well under 1% of a 5-hour window and costs one date assignment.
+    Timer {
+        id: clockTimer
+        interval: 30000
+        running: true
+        repeat: true
+        onTriggered: root.now = new Date()
     }
 
     // --- Polling timer ---

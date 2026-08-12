@@ -38,6 +38,10 @@
             <label>Label shown inside gauge</label>
             <default>time</default>
         </entry>
+        <entry name="showPace" type="Bool">
+            <label>Show pace segments and marker on the popup bars</label>
+            <default>true</default>
+        </entry>
         <entry name="currencySymbol" type="String">
             <label>Currency symbol for extra usage</label>
             <default>$</default>

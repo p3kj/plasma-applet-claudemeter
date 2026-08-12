@@ -23,6 +23,7 @@ KCM.SimpleKCM {
     property string cfg_compactMetric
     property string cfg_gaugeInnerMetric
     property string cfg_gaugeLabel
+    property alias cfg_showPace: paceCheck.checked
     property string cfg_normalColor
     property string cfg_warningColor
     property alias cfg_currencySymbol: currencyField.text
@@ -37,6 +38,7 @@ KCM.SimpleKCM {
     property var cfg_compactMetricDefault
     property var cfg_gaugeInnerMetricDefault
     property var cfg_gaugeLabelDefault
+    property var cfg_showPaceDefault
     property var cfg_normalColorDefault
     property var cfg_warningColorDefault
     property var cfg_currencySymbolDefault
@@ -118,6 +120,12 @@ KCM.SimpleKCM {
                 return 0
             }
             onActivated: cfg_gaugeLabel = model[currentIndex].value
+        }
+
+        QQC2.CheckBox {
+            id: paceCheck
+            Kirigami.FormData.label: "Popup:"
+            text: "Show pace against the limit"
         }
 
         Kirigami.Separator {

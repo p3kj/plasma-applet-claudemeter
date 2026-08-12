@@ -10,6 +10,7 @@ A KDE Plasma 6 panel applet that monitors your Claude Code rate limits.
 
 - Displays the 5-hour and 7-day (all models) rate limit windows
 - Adds a separate bar for every scoped weekly limit the API reports (e.g. Fable), discovered dynamically so new models and plan tiers work without an update
+- Popup bars show your pace: each bar is split into its hours or days, a marker tracks the current time, and usage that has run past that marker is drawn in the warning color
 - Two compact panel styles: stacked bars or circular gauge
 - Configurable warning/critical thresholds with color coding
 - Customizable bar colors
@@ -61,6 +62,7 @@ Right-click the widget and select "Configure...". Options include:
 - **Panel style** - bars (stacked) or gauge (circular arc)
 - **Gauge metric** - 5-hour window, 7-day (all models), or the most-utilized scoped weekly
 - **Inner ring** - a second, thinner arc inside the gauge for another metric (default: the top scoped weekly). Hidden when there is no such limit, when it would duplicate the gauge metric, or on a panel too thin for two rings
+- **Show pace against the limit** - segment each popup bar into its hours or days and mark where the current time falls, so a high number early in the window reads differently from the same number late in it. Usage past the marker is drawn in the warning color and labelled "Ahead of pace" (default: on)
 - **Poll interval** - how often to fetch usage data (default: 900s)
 - **Warning / Critical thresholds** - percentage thresholds for color changes
 - **Colors** - customize the normal and warning bar colors
