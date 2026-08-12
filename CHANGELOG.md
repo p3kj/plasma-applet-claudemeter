@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.4.0 - 2026-06-07
 
 - Add "Claude folder" config option to point the widget at an alternate Claude config folder (e.g. `~/.claude-personal` when using `CLAUDE_CONFIG_DIR` for multiple accounts). Each widget instance can monitor a different account

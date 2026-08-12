@@ -1,6 +1,6 @@
 # Claude Meter
 
-[![Available on the KDE Store](https://img.shields.io/badge/KDE%20Store-Get%20It-blue?logo=kde)](https://www.pling.com/p/2348058/)
+[![Available on the KDE Store](https://img.shields.io/badge/KDE%20Store-Get%20It-blue?logo=kde)](https://store.kde.org/p/2348058/)
 
 A KDE Plasma 6 panel applet that monitors your Claude Code rate limits.
 
@@ -36,7 +36,7 @@ A KDE Plasma 6 panel applet that monitors your Claude Code rate limits.
 
 ### From the KDE Store
 
-Browse to [Claude Meter on the KDE Store](https://www.pling.com/p/2348058/) and click **Install**, or use Discover (KDE's software center) to search for "Claude Meter".
+Browse to [Claude Meter on the KDE Store](https://store.kde.org/p/2348058/) and click **Install**, or use Discover (KDE's software center) to search for "Claude Meter".
 
 ### From source
 
@@ -71,6 +71,52 @@ Right-click the widget and select "Configure...". Options include:
 - **"Unauthorized" or 401 errors** - your token may have expired. Run `claude` again to refresh it.
 - **No data after install** - wait for the first poll interval (default 15 minutes), or right-click the widget and reconfigure with a shorter interval for testing.
 - **429 "Too Many Requests" errors** - the Anthropic API rate-limits usage polling. The default 15-minute interval should be safe, but if you set a very short poll interval you may get throttled. Increase the interval in the widget configuration if this happens.
+
+## Development
+
+Tasks are driven by [just](https://github.com/casey/just):
+
+```sh
+just              # list the recipes
+just check        # validate metadata, config schema, shell scripts and QML, then build
+just reinstall    # install into the running session and restart plasmashell
+just run          # open the widget standalone
+```
+
+`just reinstall` restarts plasmashell on purpose: after a reinstall the panel keeps
+running the previously cached QML, so a plain `install.sh` can look like your change
+did nothing.
+
+### Releasing
+
+Record changes as you go, then cut the release:
+
+```sh
+just note "Add a thing"      # appends a bullet under "## Unreleased" in CHANGELOG.md
+just release minor           # patch | minor | major, or an explicit 1.0.0
+```
+
+`just release` runs the preflight checks (on `master`, no stray changes, in sync with
+the remote, tag unused, `gh` authenticated), lints, shows what it is about to do and
+asks for confirmation. It then writes the version into `metadata.json`, dates the
+changelog section, builds `dist/claudemeter-<version>.plasmoid`, commits, creates an
+annotated tag, pushes, and publishes a GitHub release with the archive attached.
+
+Two deliberate holes in the "clean tree" check: an uncommitted `CHANGELOG.md` is fine,
+because the release commit picks it up, so `just note` straight into `just release`
+works. And untracked files elsewhere in the repo (design sources, screenshots) are
+ignored, since they cannot end up in the archive. An untracked file *inside* the
+packaged set does stop the release, because it would otherwise ship to the store
+without ever being committed.
+
+`DRY_RUN=1 just release patch` does all of that locally but skips the push, the GitHub
+release and the browser. Undo it with `git tag -d v<version> && git reset --hard HEAD~1`.
+
+The KDE Store is the one step that cannot be automated: its OCS API is read-only, so
+there is no way to upload a new file or set a version over HTTP. The release recipe
+therefore ends by opening the [store edit page](https://store.kde.org/p/2348058/edit)
+and `dist/` in a file manager, and putting the release notes on your clipboard, leaving
+you the upload, the version field and a save.
 
 ## License
 
