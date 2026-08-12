@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0 - 2026-08-12
+
+- Show pace on the popup bars: each bar is split into its hours or days, a marker tracks the current time, and usage that has run past that marker is drawn in the warning colour
+- Flag a bar as "Ahead of pace" when usage is more than 2 points past the current time
+- Keep the reset countdowns live instead of freezing them between polls
+- Add a "Show pace against the limit" toggle for the popup bars
+
 ## 0.5.0 - 2026-08-12
 
 - Read per-model weekly limits from the API's new `limits` array, so scoped limits like Fable appear again; the legacy `seven_day_*` fields it replaced are now all null
