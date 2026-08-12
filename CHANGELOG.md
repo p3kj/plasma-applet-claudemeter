@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 - 2026-08-12
+
+- Read per-model weekly limits from the API's new `limits` array, so scoped limits like Fable appear again; the legacy `seven_day_*` fields it replaced are now all null
+- Label scoped limits from `scope.model.display_name` instead of deriving them from the API key name
+- Add an optional inner gauge ring, defaulting to the top scoped weekly, so gauge mode can show two limits at once
 
 ## 0.4.0 - 2026-06-07
 

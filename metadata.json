@@ -12,7 +12,7 @@
         ],
         "Category": "Utilities",
         "Website": "https://github.com/p3kj/plasma-applet-claudemeter",
-        "Version": "0.4.0",
+        "Version": "0.5.0",
         "License": "MIT"
     },
     "KPackageStructure": "Plasma/Applet",
