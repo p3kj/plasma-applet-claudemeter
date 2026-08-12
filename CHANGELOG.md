@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1 - 2026-08-12
+
+- Update the widget icon: new square artwork at 256x256, which also cuts the installed package from 237 KiB to 65 KiB
+
 ## 0.6.0 - 2026-08-12
 
 - Show pace on the popup bars: each bar is split into its hours or days, a marker tracks the current time, and usage that has run past that marker is drawn in the warning colour
