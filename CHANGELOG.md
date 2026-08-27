@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.2 - 2026-08-27
 
 - Find the sign-in token when `~/.claude/.credentials.json` is missing, and say which folders were searched when it turns up nowhere (#1)
 
