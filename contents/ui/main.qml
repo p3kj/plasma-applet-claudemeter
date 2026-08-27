@@ -122,16 +122,24 @@ PlasmoidItem {
         }
     }
 
+    // The fetch script is what decides which Claude folder to read, so the
+    // activity check runs through it too — otherwise an auto-detected folder
+    // would fetch fine but never notice a new session.
+    function usageCommand(activity) {
+        var scriptPath = decodeURIComponent(Qt.resolvedUrl("../scripts/fetch_usage.sh").toString().replace(/^file:\/\//, ""))
+        var cmd = "bash \"" + scriptPath + "\""
+        if (activity) cmd += " --activity"
+        var folder = root.claudeFolder.trim()
+        if (folder) cmd += " \"" + folder + "\""
+        return cmd
+    }
+
     function fetchUsage() {
         root.fetchInFlight = true
         root.loading = true
         root.lastFetchTime = Date.now()
         fetchTimeoutTimer.restart()
-        var scriptPath = decodeURIComponent(Qt.resolvedUrl("../scripts/fetch_usage.sh").toString().replace(/^file:\/\//, ""))
-        var folder = root.claudeFolder.trim()
-        var cmd = "bash \"" + scriptPath + "\""
-        if (folder) cmd += " \"" + folder + "\""
-        executable.exec(cmd)
+        executable.exec(root.usageCommand(false))
     }
 
     function requestFetch(source) {
@@ -371,12 +379,7 @@ PlasmoidItem {
             disconnectSource(sourceName)
         }
         function check() {
-            var folder = root.claudeFolder.trim()
-            // Expand leading ~ since this runs in a non-login shell
-            if (folder.charAt(0) === "~") folder = "$HOME" + folder.slice(1)
-            var dir = folder || "$HOME/.claude"
-            // GNU stat format — Linux-only, which is fine since this is a KDE Plasma widget
-            connectSource("stat --format=%Y \"" + dir + "/history.jsonl\" 2>/dev/null || echo 0")
+            connectSource(root.usageCommand(true))
         }
     }
 
@@ -397,11 +400,7 @@ PlasmoidItem {
         running: false
         repeat: false
         onTriggered: {
-            var scriptPath = decodeURIComponent(Qt.resolvedUrl("../scripts/fetch_usage.sh").toString().replace(/^file:\/\//, ""))
-            var folder = root.claudeFolder.trim()
-            var cmd = "bash \"" + scriptPath + "\""
-            if (folder) cmd += " \"" + folder + "\""
-            executable.disconnectSource(cmd)
+            executable.disconnectSource(root.usageCommand(false))
             root.fetchInFlight = false
             root.loading = false
             root.hasError = true
