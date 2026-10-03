@@ -29,7 +29,7 @@ Item {
         Layout.rightMargin: Kirigami.Units.smallSpacing
         Layout.topMargin: Kirigami.Units.smallSpacing
         Kirigami.Heading {
-            text: "Claude Code Usage"
+            text: "Claude Code Usage" + (plasmoid.configuration.accountLabel.trim() ? " - " + plasmoid.configuration.accountLabel.trim() : "")
             level: 4
             Layout.fillWidth: true
         }

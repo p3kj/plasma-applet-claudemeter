@@ -28,6 +28,7 @@ KCM.SimpleKCM {
     property string cfg_warningColor
     property alias cfg_currencySymbol: currencyField.text
     property string cfg_claudeFolder
+    property string cfg_accountLabel
 
     // Defaults injected by Plasma config system
     property var cfg_pollIntervalDefault
@@ -198,6 +199,14 @@ KCM.SimpleKCM {
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
             Kirigami.FormData.label: "Data Source"
+        }
+
+        QQC2.TextField {
+            Kirigami.FormData.label: "Account label:"
+            placeholderText: "e.g. MAX, PRO"
+            implicitWidth: Kirigami.Units.gridUnit * 18
+            text: cfg_accountLabel
+            onTextChanged: cfg_accountLabel = text
         }
 
         QQC2.TextField {

@@ -54,6 +54,10 @@
             <label>Warning usage bar color</label>
             <default>#E5C07B</default>
         </entry>
+        <entry name="accountLabel" type="String">
+            <label>Short label shown next to the widget (e.g. MAX, PRO)</label>
+            <default></default>
+        </entry>
         <entry name="claudeFolder" type="String">
             <label>Path to Claude config folder (optional)</label>
             <default></default>
