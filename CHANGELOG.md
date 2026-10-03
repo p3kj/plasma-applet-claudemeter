@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Keep the cached usage per Claude folder, so two widget instances pointed at different accounts no longer show each other's data when the API rate-limits one of them
+
 ## 0.7.0 - 2026-09-23
 
 - Show the usage-limit reset that claude.ai offers under Settings > Usage, with what it refills, how many are left and its deadline, and spend it from the popup behind a confirmation step

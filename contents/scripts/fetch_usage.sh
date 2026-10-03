@@ -27,7 +27,6 @@ elif [ "${1:-}" = "--claim" ]; then
 fi
 
 EXPLICIT="${1:-}"
-CACHE_FILE="$HOME/.cache/claudemeter/last_usage.json"
 API="https://api.anthropic.com"
 
 # Reset grants (the usage response's `cedar_ember` block) are only offered to
@@ -102,6 +101,10 @@ if [ -z "$CRED_FILE" ] && [ -z "$EXPLICIT" ]; then
         done
     fi
 fi
+
+# Cache per Claude folder so several widget instances never show each other's data
+CACHE_FILE="$HOME/.cache/claudemeter/last_usage_$(printf %s "$CLAUDE_DIR" | cksum | cut -d' ' -f1).json"
+export CACHE_FILE
 
 # Activity mode needs only the folder, not a token.
 if [ "$MODE" = "activity" ]; then
@@ -295,9 +298,9 @@ try:
         json.dump({'error': 'api_error', 'message': str(msg)}, sys.stdout)
     else:
         data['_fetched_at'] = int(time.time())
-        cache_dir = os.path.expanduser('~/.cache/claudemeter')
-        os.makedirs(cache_dir, exist_ok=True)
-        with open(os.path.join(cache_dir, 'last_usage.json'), 'w') as f:
+        cache_file = os.environ['CACHE_FILE']
+        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+        with open(cache_file, 'w') as f:
             json.dump(data, f)
         json.dump(data, sys.stdout)
 except Exception:
