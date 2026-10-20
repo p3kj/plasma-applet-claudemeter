@@ -21,6 +21,10 @@ Of the credentials file it only looks at expiresAt, whether refreshToken is
 set, and refreshTokenExpiresAt. No token value is used, printed, logged or
 passed on, and Claude Code's own output is discarded.
 
+The widget's own HTTP(S) proxy, password included, arrives in the environment
+(CLAUDEMETER_PROXY_*) and reaches Claude Code the same way, never on a
+command line.
+
 Always prints JSON and exits 0; problems are reported in the JSON.
 """
 
@@ -36,6 +40,7 @@ import stat
 import subprocess
 import sys
 import time
+from urllib.parse import quote
 
 # Automatic tries: at most one per 30 minutes, doubling after every try in a
 # row that did not renew, up to a day. A click ("--now") skips the wait.
@@ -96,6 +101,10 @@ SCRUBBED_ENV = (
     "CLAUDE_CODE_ENTRYPOINT",
     "CLAUDE_CODE_CHILD_SESSION",
 )
+# The proxy set on the widget's Proxy page, from fetch_usage.sh. Claude Code
+# uses the first of PROXY_OUT that is set, so all of them are set to it.
+PROXY_IN = ("CLAUDEMETER_PROXY_URL", "CLAUDEMETER_PROXY_USER", "CLAUDEMETER_PROXY_PASSWORD")
+PROXY_OUT = ("https_proxy", "HTTPS_PROXY", "http_proxy", "HTTP_PROXY")
 STOP_SIGNALS = (signal.SIGTERM, signal.SIGHUP, signal.SIGINT)
 
 
@@ -273,7 +282,23 @@ def child_env(folder):
         env.pop("CLAUDE_CONFIG_DIR", None)
     else:
         env["CLAUDE_CONFIG_DIR"] = folder
+    with_proxy(env)
     return env
+
+
+def with_proxy(env):
+    """Point Claude Code at the widget's proxy, if fetch_usage.sh passed one."""
+    url, user, password = (env.pop(name, "") for name in PROXY_IN)
+    if not url:
+        return
+    if user:
+        scheme, rest = url.split("://", 1)
+        url = f"{scheme}://{quote(user, safe='')}:{quote(password, safe='')}@{rest}"
+    for name in PROXY_OUT:
+        env[name] = url
+    # The widget's proxy wins over exceptions set for the session, as in curl.
+    env.pop("NO_PROXY", None)
+    env.pop("no_proxy", None)
 
 
 def wait_out_refresh(proc, folder):

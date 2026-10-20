@@ -97,6 +97,12 @@ PlasmoidItem {
     readonly property int criticalThreshold: plasmoid.configuration.criticalThreshold
     readonly property string claudeFolder: plasmoid.configuration.claudeFolder
     readonly property bool renewSignIn: plasmoid.configuration.renewSignIn
+    // Changes whenever anything on the Proxy page does.
+    readonly property var proxySettings: [
+        plasmoid.configuration.proxyEnabled, plasmoid.configuration.proxyType,
+        plasmoid.configuration.proxyHost, plasmoid.configuration.proxyPort,
+        plasmoid.configuration.proxyUser, plasmoid.configuration.proxyPassword
+    ]
 
     // --- Compact gauge computed properties ---
     readonly property string compactMetric: plasmoid.configuration.compactMetric
@@ -149,6 +155,8 @@ PlasmoidItem {
     // --- Executable DataSource ---
     Plasma5Support.DataSource {
         id: executable
+        // The running fetch's command: a proxy setting can change it meanwhile.
+        property string command: ""
         engine: "executable"
         connectedSources: []
         onNewData: (sourceName, data) => {
@@ -163,9 +171,18 @@ PlasmoidItem {
 
     // The fetch script is what decides which Claude folder to read, so the
     // activity check runs through it too — otherwise an auto-detected folder
-    // would fetch fine but never notice a new session.
+    // would fetch fine but never notice a new session. It sends no request, so
+    // it needs no proxy.
     function usageCommand(activity) {
-        return root.scriptCommand(activity ? ["--activity"] : [])
+        return root.scriptCommand(activity ? ["--activity"] : root.proxyArgs())
+    }
+
+    // Only ids go on the command line: the script reads the proxy settings,
+    // password included, from the file Plasma keeps this widget's settings in.
+    function proxyArgs() {
+        if (!plasmoid.configuration.proxyEnabled) return []
+        var containment = plasmoid.containment ? plasmoid.containment.id : 0
+        return ["--proxy-from", Qt.application.name + ":" + containment + ":" + plasmoid.id]
     }
 
     // The DataSource runs this through `sh -c`, so every part is single-quoted:
@@ -190,7 +207,8 @@ PlasmoidItem {
         root.loading = true
         root.lastFetchTime = Date.now()
         fetchTimeoutTimer.restart()
-        executable.exec(root.usageCommand(false))
+        executable.command = root.usageCommand(false)
+        executable.exec(executable.command)
     }
 
     // Returns whether a fetch was started.
@@ -248,7 +266,7 @@ PlasmoidItem {
                 root.errorMessage = data.message || data.error
                 // A window-end refetch right after a resume often beats the
                 // network back; let the next tick try again.
-                if (data.error === "network_error") root.lastWindowEndFetch = 0
+                if (data.error === "network_error" || data.error === "proxy_error") root.lastWindowEndFetch = 0
                 return
             }
             root.hasError = false
@@ -480,7 +498,7 @@ PlasmoidItem {
         root.claimInFlight = true
         root.claimMessage = ""
         root.claimSucceeded = false
-        claimRunner.command = root.scriptCommand(["--claim", grant.id, root.claimRequestId])
+        claimRunner.command = root.scriptCommand(["--claim", grant.id, root.claimRequestId].concat(root.proxyArgs()))
         claimTimeoutTimer.restart()
         claimRunner.connectSource(claimRunner.command)
     }
@@ -576,7 +594,7 @@ PlasmoidItem {
         if (root.renewInFlight) return
         root.renewInFlight = true
         root.renewMessage = ""
-        renewRunner.command = root.scriptCommand(now ? ["--renew", "--now"] : ["--renew"])
+        renewRunner.command = root.scriptCommand((now ? ["--renew", "--now"] : ["--renew"]).concat(root.proxyArgs()))
         renewTimeoutTimer.restart()
         renewRunner.connectSource(renewRunner.command)
     }
@@ -749,7 +767,7 @@ PlasmoidItem {
         running: false
         repeat: false
         onTriggered: {
-            executable.disconnectSource(root.usageCommand(false))
+            executable.disconnectSource(executable.command)
             root.fetchInFlight = false
             root.followUpFetch = false
             root.loading = false
@@ -836,6 +854,26 @@ PlasmoidItem {
     // A stale confirmation or result would be confusing the next time the popup opens.
     onExpandedChanged: {
         if (!root.expanded && !root.claimInFlight) root.claimMessage = ""
+    }
+
+    // A new proxy setting is tried right away, so a wrong one shows up now
+    // rather than at the next poll. Delayed because the settings dialog updates
+    // these values just before it writes the file the script reads them from,
+    // and so that one Apply makes one fetch. The binding also fires once while
+    // the widget is created; the startup fetch covers that one.
+    property bool proxySettingsSeen: false
+    onProxySettingsChanged: if (root.proxySettingsSeen) proxyChangeTimer.restart()
+    Component.onCompleted: root.proxySettingsSeen = true
+
+    Timer {
+        id: proxyChangeTimer
+        interval: 1000
+        running: false
+        repeat: false
+        onTriggered: {
+            if (root.fetchInFlight) restart()
+            else root.requestFetch("manual")
+        }
     }
 
     // --- Delay before fetching after activity ---

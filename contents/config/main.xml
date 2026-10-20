@@ -66,5 +66,34 @@
             <label>Start Claude Code hidden for a moment to renew an expired sign-in</label>
             <default>false</default>
         </entry>
+        <!-- fetch_usage.sh reads these from Plasma's settings file itself, so the
+             password never goes on a command line. Plasma leaves out a key that
+             is at its default, so the script repeats the type and port defaults. -->
+        <entry name="proxyEnabled" type="Bool">
+            <label>Send the widget's requests through a proxy</label>
+            <default>false</default>
+        </entry>
+        <entry name="proxyType" type="String">
+            <label>Proxy type: http, https, socks5 or socks5h</label>
+            <default>http</default>
+        </entry>
+        <entry name="proxyHost" type="String">
+            <label>Proxy host name or IP address</label>
+            <default></default>
+        </entry>
+        <entry name="proxyPort" type="Int">
+            <label>Proxy port</label>
+            <default>8080</default>
+            <min>1</min>
+            <max>65535</max>
+        </entry>
+        <entry name="proxyUser" type="String">
+            <label>Proxy user name (optional)</label>
+            <default></default>
+        </entry>
+        <entry name="proxyPassword" type="String">
+            <label>Proxy password (optional)</label>
+            <default></default>
+        </entry>
     </group>
 </kcfg>
