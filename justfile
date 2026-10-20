@@ -30,7 +30,7 @@ lint:
     python3 -c 'import xml.etree.ElementTree as e; e.parse("contents/config/main.xml")' || failed=1
 
     echo "==> shell scripts"
-    for script in install.sh contents/scripts/fetch_usage.sh tests/test_renew.sh; do
+    for script in install.sh contents/scripts/fetch_usage.sh tests/test_renew.sh tests/test_proxy.sh; do
         bash -n "$script" || failed=1
     done
 
@@ -86,6 +86,10 @@ package:
 # Test sign-in renewal against a stub claude in a throwaway HOME (about 90s).
 test-renew:
     bash tests/test_renew.sh
+
+# Test the proxy settings against a stub curl in a throwaway HOME (a few seconds).
+test-proxy:
+    bash tests/test_proxy.sh
 
 # Lint and build without touching git. Safe to run any time.
 check: lint package

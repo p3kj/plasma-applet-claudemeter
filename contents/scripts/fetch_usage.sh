@@ -2,9 +2,14 @@
 # Fetch Claude Code usage data from the Anthropic API
 # Outputs JSON to stdout. Always exits 0; errors reported as JSON.
 #
-# Usage: fetch_usage.sh [--activity] [-- claude-folder]
-#        fetch_usage.sh --claim <grant-id> <request-id> [-- claude-folder]
-#        fetch_usage.sh --renew [--now] [-- claude-folder]
+# Usage: fetch_usage.sh [--activity] [--proxy-from APP:CONTAINMENT:APPLET] [-- claude-folder]
+#        fetch_usage.sh --claim <grant-id> <request-id> [--proxy-from ...] [-- claude-folder]
+#        fetch_usage.sh --renew [--now] [--proxy-from ...] [-- claude-folder]
+#   --proxy-from  send the requests through the proxy set on the Proxy page of
+#               this widget instance (Plasma app name, containment id, applet
+#               id). The settings, password included, are read from Plasma's
+#               own settings file, so none of them is on a command line.
+#               --activity ignores it.
 #   --          everything after it is the folder, even if it starts with a
 #               dash. The widget always passes it. Without it, a folder that
 #               starts with a dash is refused rather than read as a mode.
@@ -48,6 +53,16 @@ elif [ "${1:-}" = "--renew" ]; then
     fi
 fi
 
+# Tracked apart from the value, so "--proxy-from" with a missing or empty
+# value fails instead of quietly going direct.
+PROXY_WANTED=""
+PROXY_REF=""
+if [ "${1:-}" = "--proxy-from" ]; then
+    PROXY_WANTED="1"
+    PROXY_REF="${2:-}"
+    shift 2 || shift $#
+fi
+
 DASHDASH=""
 if [ "${1:-}" = "--" ]; then
     DASHDASH="1"
@@ -80,6 +95,12 @@ if [ -z "$DASHDASH" ] && [ "${EXPLICIT#-}" != "$EXPLICIT" ]; then
     error_json "bad_folder" "Refusing the Claude folder \"$EXPLICIT\": it starts with a dash. Put -- before it."
 fi
 
+# Nothing may follow the folder: a flag there would be ignored, and a request
+# meant for the proxy would go direct.
+if [ "$#" -gt 1 ]; then
+    error_json "bad_arguments" "Refusing unexpected arguments after the Claude folder."
+fi
+
 # Abbreviate $HOME to ~ for display. Done with bash substitution rather than sed
 # so paths containing regex or delimiter metacharacters cannot corrupt it.
 tildify() {
@@ -89,6 +110,199 @@ tildify() {
     else
         printf '%s' "$p"
     fi
+}
+
+trim() {
+    local v="$1"
+    v="${v#"${v%%[![:space:]]*}"}"
+    printf '%s' "${v%"${v##*[![:space:]]}"}"
+}
+
+# Filled by load_proxy. PROXY_URL never holds the user or the password.
+PROXY_TYPE=""
+PROXY_HOST=""
+PROXY_HOSTPORT=""
+PROXY_URL=""
+PROXY_USER=""
+PROXY_PASSWORD=""
+PROXY_USERPASS=""
+
+# Messages name the host only once it is checked, and never the user or the
+# password: error_json puts its message on python3's command line.
+proxy_error() {
+    local msg="$1"
+    if [ "$MODE" = "claim" ]; then
+        msg="$msg Nothing was used."
+    fi
+    error_json "proxy_error" "$msg"
+}
+
+# config_value <file> <key> <group args...>: the value in VALUE, empty when the
+# file, group or key is missing (kreadconfig6 exits 0 for all of those). The x
+# keeps $(...) from stripping more than kreadconfig6's own newline.
+config_value() {
+    VALUE="$(kreadconfig6 --file "$1" "${@:3}" --key "$2" 2>/dev/null; printf x)"
+    VALUE="${VALUE%x}"
+    VALUE="${VALUE%$'\n'}"
+}
+
+# Reads this widget's Proxy page from the file Plasma keeps its settings in.
+# Anything missing or malformed is a proxy_error, never a direct request.
+# Called directly, never in $(...), so that error_json ends the script.
+load_proxy() {
+    # In a UTF-8 locale, [0-9] also matches digits such as ٣ or ８, which
+    # would get past the checks below and then break the arithmetic on them.
+    local LC_ALL=C
+    local not_found="Could not find this widget's proxy settings. Open the Proxy page and click Apply, or turn the proxy off."
+    if ! [[ "$PROXY_REF" =~ ^([A-Za-z0-9._-]{1,64}):([0-9]{1,10}):([0-9]{1,10})$ ]]; then
+        proxy_error "$not_found"
+    fi
+    local app="${BASH_REMATCH[1]}" containment="${BASH_REMATCH[2]}" applet="${BASH_REMATCH[3]}"
+    if ! command -v kreadconfig6 >/dev/null; then
+        proxy_error "The proxy needs kreadconfig6, which was not found. It is part of KDE Frameworks (package kconfig, or libkf6config-bin on Debian and Ubuntu)."
+    fi
+    local config="${XDG_CONFIG_HOME:-}"
+    case "$config" in
+        /*) ;;
+        *) config="$HOME/.config" ;;
+    esac
+    # plasmawindowed (`just run`) keeps its applets in its own rc file, each
+    # Plasma shell in a plasma-<shell>-appletsrc.
+    local files=() groups=()
+    if [ "$app" = "plasmawindowed" ]; then
+        files=("$config/plasmawindowedrc")
+        groups=(--group Applets --group "$applet")
+    else
+        files=("$config"/plasma-*-appletsrc)
+        groups=(--group Containments --group "$containment" --group Applets --group "$applet")
+    fi
+    local general=("${groups[@]}" --group Configuration --group General)
+    local file found=()
+    for file in "${files[@]}"; do
+        [ -f "$file" ] || continue
+        # Read as a bool, so 1, yes and on count as they do for Plasma.
+        # kreadconfig6 answers a bool with its exit code alone.
+        if kreadconfig6 --file "$file" --type bool "${general[@]}" --key proxyEnabled >/dev/null 2>&1; then
+            found+=("$file")
+        fi
+    done
+    if [ "${#found[@]}" -ne 1 ]; then
+        proxy_error "$not_found"
+    fi
+    file="${found[0]}"
+
+    # Plasma leaves out a value that is at its default (see main.xml).
+    config_value "$file" proxyType "${general[@]}"
+    PROXY_TYPE="${VALUE:-http}"
+    case "$PROXY_TYPE" in
+        http|https|socks5|socks5h) ;;
+        *) proxy_error "The proxy type is not HTTP, HTTPS, SOCKS5 or SOCKS5h. Pick one on the Proxy page." ;;
+    esac
+
+    config_value "$file" proxyHost "${general[@]}"
+    local host
+    host="$(trim "$VALUE")"
+    if [[ "$host" == \[*\] ]]; then
+        host="${host:1:${#host}-2}"
+    fi
+    if [ -z "$host" ]; then
+        proxy_error "The proxy is on, but has no host. Set one on the Proxy page, or turn the proxy off."
+    fi
+    # A host name, or an IPv6 address (which gets brackets in the URL). curl
+    # judges whether the address itself is valid (exit 3, see blame_proxy).
+    if [[ "$host" == *:* ]]; then
+        [[ "$host" =~ ^[0-9A-Fa-f:.]{2,45}$ ]] || host=""
+    elif ! [[ "$host" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]{0,252}$ ]]; then
+        host=""
+    fi
+    if [ -z "$host" ]; then
+        proxy_error "The proxy host on the Proxy page is not a host name or an IP address."
+    fi
+
+    config_value "$file" proxyPort "${general[@]}"
+    local port="${VALUE:-8080}"
+    if ! [[ "$port" =~ ^[0-9]{1,5}$ ]] || [ "$((10#$port))" -lt 1 ] || [ "$((10#$port))" -gt 65535 ]; then
+        proxy_error "The proxy port on the Proxy page is not between 1 and 65535."
+    fi
+    port="$((10#$port))"
+
+    # A password without a user name is never sent.
+    config_value "$file" proxyUser "${general[@]}"
+    PROXY_USER="$(trim "$VALUE")"
+    PROXY_PASSWORD=""
+    if [ -n "$PROXY_USER" ]; then
+        config_value "$file" proxyPassword "${general[@]}"
+        PROXY_PASSWORD="$VALUE"
+    fi
+    VALUE=""
+    # curl splits user:password at the first colon.
+    if [[ "$PROXY_USER" == *:* ]]; then
+        proxy_error "The proxy user name on the Proxy page contains a colon, which curl would read as the start of the password."
+    fi
+    if [[ "$PROXY_USER$PROXY_PASSWORD" == *[[:cntrl:]]* ]]; then
+        proxy_error "The proxy user name or password on the Proxy page contains a tab, a line break or another control character."
+    fi
+
+    PROXY_HOST="$host"
+    if [[ "$host" == *:* ]]; then
+        PROXY_HOSTPORT="[$host]:$port"
+    else
+        PROXY_HOSTPORT="$host:$port"
+    fi
+    PROXY_URL="$PROXY_TYPE://$PROXY_HOSTPORT"
+    PROXY_USERPASS=""
+    if [ -n "$PROXY_USER" ]; then
+        PROXY_USERPASS="$PROXY_USER:$PROXY_PASSWORD"
+    fi
+}
+
+# A value in double quotes for curl's config. Inside them curl only reads
+# \\ \" \t \n \r \v as escapes, so with \ and " escaped and control characters
+# refused above, a password stays one value and cannot add curl options.
+curl_quoted() {
+    local v="${1//\\/\\\\}"
+    printf '"%s"' "${v//\"/\\\"}"
+}
+
+# What curl reads on stdin (-K -): the token, and the proxy when one is set.
+# Only bash builtins see these values, so none of them is on a command line.
+curl_config() {
+    printf 'header = "Authorization: Bearer %s"\n' "$TOKEN"
+    if [ -z "$PROXY_URL" ]; then
+        return 0
+    fi
+    printf 'proxy = %s\n' "$(curl_quoted "$PROXY_URL")"
+    # The widget's proxy wins over a no_proxy in the environment.
+    printf 'noproxy = ""\n'
+    if [ -n "$PROXY_USERPASS" ]; then
+        printf 'proxy-user = %s\n' "$(curl_quoted "$PROXY_USERPASS")"
+        # Lets curl answer a proxy that asks for Digest, NTLM or Negotiate.
+        case "$PROXY_TYPE" in
+            http|https) printf 'proxy-anyauth\n' ;;
+        esac
+    fi
+}
+
+# blame_proxy <curl exit code> <CONNECT reply code>: a proxy_error when the
+# proxy is what failed, so the message does not point at Anthropic. In each of
+# these cases nothing reached Anthropic.
+blame_proxy() {
+    if [ -z "$PROXY_URL" ]; then
+        return 0
+    fi
+    case "$2" in
+        407) proxy_error "The proxy at $PROXY_HOSTPORT wants a user name and password, or did not accept the ones on the Proxy page." ;;
+        000|200) ;;
+        [1-5][0-9][0-9]) proxy_error "The proxy at $PROXY_HOSTPORT refused the connection (HTTP $2)." ;;
+    esac
+    case "$1" in
+        3) proxy_error "The proxy address $PROXY_HOSTPORT is not valid." ;;
+        5) proxy_error "Could not find the proxy host $PROXY_HOST." ;;
+        7) proxy_error "Could not connect to the proxy at $PROXY_HOSTPORT." ;;
+        35) proxy_error "Could not set up a secure connection to the proxy at $PROXY_HOSTPORT. If it is a plain HTTP proxy, pick HTTP as the type." ;;
+        60) proxy_error "The certificate check failed behind the proxy at $PROXY_HOSTPORT. If the proxy inspects TLS, add its CA certificate to the system store." ;;
+        97) proxy_error "The proxy at $PROXY_HOSTPORT refused the connection. Check its type, user name and password." ;;
+    esac
 }
 
 # Which folders to look in. An explicit first arg (the widget's "Claude folder"
@@ -160,7 +374,34 @@ if [ "$MODE" = "renew" ]; then
     if [ -n "$RENEW_NOW" ]; then
         RENEW_ARGS+=(--now)
     fi
+    # The widget's proxy reaches Claude Code in its environment only (the
+    # helper turns it into https_proxy and the like). Claude Code has no SOCKS
+    # support, and starting it without the proxy would go direct, so it is
+    # not started at all then.
+    unset CLAUDEMETER_PROXY_URL CLAUDEMETER_PROXY_USER CLAUDEMETER_PROXY_PASSWORD
+    if [ -n "$PROXY_WANTED" ]; then
+        load_proxy
+        case "$PROXY_TYPE" in
+            http|https)
+                export CLAUDEMETER_PROXY_URL="$PROXY_URL"
+                export CLAUDEMETER_PROXY_USER="$PROXY_USER"
+                export CLAUDEMETER_PROXY_PASSWORD="$PROXY_PASSWORD"
+                ;;
+            *)
+                proxy_error "Claude Code cannot use a SOCKS proxy, so the widget cannot refresh the token. Run claude in a terminal to refresh it, or turn off the automatic refresh."
+                ;;
+        esac
+    fi
     exec python3 -I "$RENEW_HELPER" "${RENEW_ARGS[@]}"
+fi
+
+# Only reached if bash gave up on the block above (an expansion error skips a
+# whole top-level command): a refresh must never turn into a fetch.
+if [ "$MODE" = "renew" ]; then
+    if [ -n "$PROXY_WANTED" ]; then
+        proxy_error "Could not read this widget's proxy settings, so the token was not refreshed. Open the Proxy page and click Apply, or turn the proxy off."
+    fi
+    error_json "renew_error" "Could not start the token refresh. Run claude in a terminal to refresh it."
 fi
 
 # Extract token and check expiry via python3, reading creds from file (not args)
@@ -230,6 +471,17 @@ print(json.dumps({'error': 'token_expired', 'message': sys.argv[1], 'renew': jso
     exit 0
 fi
 
+# After the token checks, so an expired token is still reported as such (the
+# automatic refresh depends on it) even with a broken proxy setting.
+if [ -n "$PROXY_WANTED" ]; then
+    load_proxy
+fi
+# A separate command, so it still runs if bash gave up on the one above (an
+# expansion error skips a whole top-level command): never a direct request.
+if [ -n "$PROXY_WANTED" ] && [ -z "$PROXY_URL" ]; then
+    proxy_error "Could not read this widget's proxy settings. Open the Proxy page and click Apply, or turn the proxy off."
+fi
+
 TMPFILE=$(mktemp)
 trap 'rm -f "$TMPFILE"' EXIT
 
@@ -276,16 +528,24 @@ for path in sys.argv[1:]:
 
     # 25s matches Claude Code. A timeout here does not mean nothing happened:
     # the server may have applied the reset, so it is reported as unconfirmed.
-    HTTP_CODE=$(printf 'header = "Authorization: Bearer %s"\n' "$TOKEN" | \
-        curl -s --max-time 25 -o "$TMPFILE" -w '%{http_code}' \
+    CURL_RC=0
+    CURL_OUT=$(curl_config | \
+        curl -s --max-time 25 -o "$TMPFILE" -w '%{http_code} %{http_connect}' \
         -K - \
         -X POST \
         -H "anthropic-beta: oauth-2025-04-20" \
         -H "Content-Type: application/json" \
         -A "$USER_AGENT" \
         --data-binary "$BODY" \
-        "$URL" 2>/dev/null) || HTTP_CODE="000"
+        "$URL" 2>/dev/null) || CURL_RC=$?
     TOKEN=""
+    PROXY_USERPASS=""
+    read -r HTTP_CODE CONNECT_CODE _ <<< "$CURL_OUT" || true
+    if [ "$CURL_RC" -ne 0 ]; then
+        # A proxy that failed before the request went out: nothing was used.
+        blame_proxy "$CURL_RC" "${CONNECT_CODE:-}"
+        HTTP_CODE="000"
+    fi
 
     python3 -c "
 import json, sys
@@ -313,16 +573,27 @@ json.dump({'claim': out}, sys.stdout)
     exit 0
 fi
 
-# Call usage API - auth header passed via stdin (-K -) to avoid token in /proc/cmdline.
+# Call usage API - auth header (and proxy) passed via stdin (-K -) to keep the
+# token and the proxy password out of /proc/cmdline.
 # `cedar_ember=1` adds the reset grants to the response.
-HTTP_CODE=$(printf 'header = "Authorization: Bearer %s"\n' "$TOKEN" | \
-    curl -s --max-time 10 -o "$TMPFILE" -w '%{http_code}' \
+CURL_RC=0
+CURL_OUT=$(curl_config | \
+    curl -s --max-time 10 -o "$TMPFILE" -w '%{http_code} %{http_connect}' \
     -K - \
     -H "anthropic-beta: oauth-2025-04-20" \
     -A "$USER_AGENT" \
-    "$API/api/oauth/usage?cedar_ember=1" 2>/dev/null) || error_json "network_error" "Failed to reach Anthropic API"
+    "$API/api/oauth/usage?cedar_ember=1" 2>/dev/null) || CURL_RC=$?
 
 TOKEN=""
+PROXY_USERPASS=""
+read -r HTTP_CODE CONNECT_CODE _ <<< "$CURL_OUT" || true
+if [ "$CURL_RC" -ne 0 ]; then
+    blame_proxy "$CURL_RC" "${CONNECT_CODE:-}"
+    if [ -n "$PROXY_URL" ]; then
+        error_json "network_error" "Failed to reach Anthropic API through the proxy at $PROXY_HOSTPORT"
+    fi
+    error_json "network_error" "Failed to reach Anthropic API"
+fi
 
 if [ "$HTTP_CODE" = "429" ]; then
     if [ -f "$CACHE_FILE" ]; then

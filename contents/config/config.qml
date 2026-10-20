@@ -8,4 +8,9 @@ ConfigModel {
         icon: "configure"
         source: "config/ConfigGeneral.qml"
     }
+    ConfigCategory {
+        name: "Proxy"
+        icon: "preferences-system-network-proxy"
+        source: "config/ConfigProxy.qml"
+    }
 }
