@@ -11,10 +11,8 @@ Item {
     readonly property int barThickness: Math.max(3, Math.round(
         (isVertical ? barsRep.width : barsRep.height) / 5))
     readonly property var barModel: {
-        var bars = [
-            { util: root.fiveHourUtil },
-            { util: root.sevenDayUtil }
-        ]
+        var bars = root.hasFiveHour ? [{ util: root.fiveHourUtil }] : []
+        bars.push({ util: root.sevenDayUtil })
         for (var i = 0; i < root.weeklyModels.length; i++) {
             bars.push({ util: root.weeklyModels[i].util })
         }

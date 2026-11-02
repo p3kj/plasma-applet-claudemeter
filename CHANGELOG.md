@@ -4,6 +4,7 @@
 
 - New icon: the widget in a panel with its popup open, the same picture as the KDE Store logo
 - Add an optional proxy on a new Proxy settings page: HTTP, HTTPS, SOCKS5 or SOCKS5h, with an optional user name and password. It covers the usage fetch, limit resets and, with an HTTP or HTTPS proxy, the token refresh. The password stays off every command line: the script reads it from Plasma's settings file and hands it to curl on stdin (#3, thanks @AltairWN)
+- Support Ultra accounts, which have no 5-hour limit since 2026-10-30: the 5-hour bar is left out of the panel, the popup and the tooltip instead of sitting at 0%, a gauge set to the 5-hour window shows the weekly limit, and switching from Max to Ultra no longer leaves the last 5-hour value behind
 
 ## 0.8.0 - 2026-10-13
 

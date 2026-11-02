@@ -10,6 +10,10 @@ PlasmoidItem {
     id: root
 
     // --- Usage data properties ---
+    // False when the account has no 5-hour limit at all (verified Ultra since
+    // 2026-10-30), as opposed to a window that is merely idle. True until the
+    // first payload says otherwise, so a 5-hour account never sees it flicker.
+    property bool hasFiveHour: true
     property real fiveHourUtil: 0
     property string fiveHourResets: ""
     property real sevenDayUtil: 0
@@ -115,9 +119,10 @@ PlasmoidItem {
         return top
     }
     // Anything unrecognised, including a config value left over from an older
-    // release, falls back to the 5-hour window.
+    // release, falls back to the 5-hour window, or to the weekly one on an
+    // account that has no 5-hour limit.
     readonly property string outerMetric: (compactMetric === "seven_day" || compactMetric === "model_weekly")
-        ? compactMetric : "five_hour"
+        ? compactMetric : hasFiveHour ? "five_hour" : "seven_day"
     readonly property real compactUtil: metricUtil(outerMetric)
     readonly property string compactResets: metricResets(outerMetric)
     readonly property color compactColor: usageColor(compactUtil)
@@ -281,11 +286,20 @@ PlasmoidItem {
             var sessionLimit = root.findLimit(limits, "session")
             var weeklyAllLimit = root.findLimit(limits, "weekly_all")
             if (data.five_hour) {
+                root.hasFiveHour = true
                 root.fiveHourUtil = data.five_hour.utilization || 0
                 root.fiveHourResets = data.five_hour.resets_at || ""
             } else if (sessionLimit) {
+                root.hasFiveHour = true
                 root.fiveHourUtil = sessionLimit.percent || 0
                 root.fiveHourResets = sessionLimit.resets_at || ""
+            } else {
+                // Verified Ultra accounts get `five_hour: null` and no session
+                // entry in `limits`: no such limit, so no bar, rather than a
+                // made-up 0% or whatever the last payload with one said.
+                root.hasFiveHour = false
+                root.fiveHourUtil = 0
+                root.fiveHourResets = ""
             }
             if (data.seven_day) {
                 root.sevenDayUtil = data.seven_day.utilization || 0
@@ -459,7 +473,11 @@ PlasmoidItem {
     function resetClearsText(grant) {
         if (!grant) return ""
         var names = []
-        for (var i = 0; i < grant.clears.length; i++) names.push(root.limitNameFor(grant.clears[i]))
+        for (var i = 0; i < grant.clears.length; i++) {
+            // Not a limit this account has, so not something the reset refills.
+            if (grant.clears[i] === "five_hour" && !root.hasFiveHour) continue
+            names.push(root.limitNameFor(grant.clears[i]))
+        }
         if (names.length === 0) return "your limits"
         if (names.length === 1) return names[0]
         return names.slice(0, -1).join(", ") + " and " + names[names.length - 1]

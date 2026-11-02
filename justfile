@@ -36,7 +36,7 @@ lint:
 
     echo "==> python"
     # ast.parse rather than py_compile, so no __pycache__ lands in contents/.
-    for script in contents/scripts/renew_signin.py; do
+    for script in contents/scripts/renew_signin.py tests/test_usage_parse.py; do
         python3 -c 'import ast, sys; ast.parse(open(sys.argv[1]).read(), sys.argv[1])' "$script" || failed=1
     done
 
@@ -90,6 +90,10 @@ test-renew:
 # Test the proxy settings against a stub curl in a throwaway HOME (a few seconds).
 test-proxy:
     bash tests/test_proxy.sh
+
+# Feed usage payloads through the real main.qml parsing under qml6 (a few seconds).
+test-parse:
+    python3 tests/test_usage_parse.py
 
 # Lint and build without touching git. Safe to run any time.
 check: lint package

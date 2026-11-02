@@ -14,7 +14,7 @@ A KDE Plasma 6 panel applet that monitors your Claude Code rate limits.
 
 <img src="docs/screenshots/popup-dark.png" alt="The popup: usage bars with pace markers, a limit reset and extra usage" width="320" align="right">
 
-- The 5-hour window, the weekly limit and every per-model weekly limit the API reports (such as Fable), each with a reset countdown. New limits show up without an update
+- The 5-hour window, the weekly limit and every per-model weekly limit the API reports (such as Fable), each with a reset countdown. New limits show up without an update, and a plan without a 5-hour limit (Ultra) gets no 5-hour bar
 - Pace: each popup bar is split into its hours or days, with a marker at the current time. Usage past the marker turns the warning color, or the critical color once the bar is above the warning threshold, and a bar more than 2 points ahead says "Ahead of pace"
 - Bars or a gauge in the panel, the gauge with an optional inner ring for a second limit
 - Several accounts side by side: one widget per Claude folder, each with a short label
@@ -35,7 +35,7 @@ It then calls `GET https://api.anthropic.com/api/oauth/usage?cedar_ember=1` as t
 
 ## Install
 
-You need KDE Plasma 6, `python3`, `curl`, and the Claude Code CLI signed in with a Claude plan (Pro, Max or Team).
+You need KDE Plasma 6, `python3`, `curl`, and the Claude Code CLI signed in with a Claude plan (Pro, Max, Ultra or Team).
 
 **From the KDE Store:** click **Install** on [Claude Meter on the KDE Store](https://store.kde.org/p/2348058/), or search for "Claude Meter" in Discover or in **Add Widgets > Get New Widgets**.
 
@@ -63,7 +63,7 @@ Right-click the widget and choose **Configure...**.
 | Setting | What it does | Default |
 |---|---|---|
 | Panel style | Bars or Gauge | Bars |
-| Gauge metric | The limit the gauge shows: 5-hour, weekly, or the fullest per-model weekly | 5-hour |
+| Gauge metric | The limit the gauge shows: 5-hour, weekly, or the fullest per-model weekly. On a plan without a 5-hour limit, 5-hour shows the weekly limit | 5-hour |
 | Inner ring | A second, thinner ring for another limit, or None. Hidden when that limit has no data, would repeat the gauge, or the panel is too thin | Fullest per-model weekly |
 | Gauge label | Time remaining, percentage or no label inside the gauge | Time remaining |
 | Show pace against the limit | Pace segments and marker on the popup bars | On |
@@ -146,6 +146,7 @@ just              # list the recipes
 just check        # lint metadata, config schema, shell, Python and QML, then build
 just test-renew   # test the token refresh against a stub claude in a throwaway HOME
 just test-proxy   # test the proxy settings against a stub curl in a throwaway HOME
+just test-parse   # feed usage payloads (Max, Ultra, ...) through the real QML parsing
 just reinstall    # install and restart plasmashell, which otherwise keeps the old QML
 just run          # open the installed widget in a window
 just screenshots  # re-render docs/screenshots from the real QML (needs a desktop session)
