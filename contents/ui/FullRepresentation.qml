@@ -130,6 +130,7 @@ Item {
 
         UsageBar {
             Layout.fillWidth: true
+            visible: root.hasFiveHour
             label: "5-Hour Window"
             percentage: root.fiveHourUtil
             barColor: root.usageColor(root.fiveHourUtil)

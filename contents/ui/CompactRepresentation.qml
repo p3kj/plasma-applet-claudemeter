@@ -25,10 +25,8 @@ MouseArea {
             var prefix = compactRep.accountLabel ? compactRep.accountLabel + " - " : ""
             if (root.renewInFlight) return prefix + "Claude Code is refreshing its token…"
             if (root.hasError) return prefix + root.errorMessage
-            var parts = [
-                "5h: " + Math.round(root.fiveHourUtil) + "%",
-                "7d: " + Math.round(root.sevenDayUtil) + "%"
-            ]
+            var parts = root.hasFiveHour ? ["5h: " + Math.round(root.fiveHourUtil) + "%"] : []
+            parts.push("7d: " + Math.round(root.sevenDayUtil) + "%")
             for (var i = 0; i < root.weeklyModels.length; i++) {
                 var m = root.weeklyModels[i]
                 var name = m.name || m.label.replace(/^Weekly \(|\)$/g, "")
