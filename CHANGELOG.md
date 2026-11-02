@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 - 2026-11-02
 
 - New icon: the widget in a panel with its popup open, the same picture as the KDE Store logo
 - Add an optional proxy on a new Proxy settings page: HTTP, HTTPS, SOCKS5 or SOCKS5h, with an optional user name and password. It covers the usage fetch, limit resets and, with an HTTP or HTTPS proxy, the token refresh. The password stays off every command line: the script reads it from Plasma's settings file and hands it to curl on stdin (#3, thanks @AltairWN)
